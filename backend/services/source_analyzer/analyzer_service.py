@@ -73,7 +73,11 @@ class AnalyzerService:
                 "in_progress",
                 f"Resolving {len(unknown_files)} unknown files with LLM",
             )
-            llm_stats = await asyncio.to_thread(self.llm_classifier.classify_unknown_files, unknown_files)
+            llm_result = await asyncio.to_thread(self.llm_classifier.classify_unknown_files_with_traces, unknown_files)
+            llm_stats = llm_result["stats"]
+            for trace in llm_result["traces"]:
+                if progress_callback:
+                    await progress_callback(trace)
             if not self.llm_classifier.is_enabled():
                 llm_message = "Skipped because OPENAI_API_KEY is not configured"
             else:

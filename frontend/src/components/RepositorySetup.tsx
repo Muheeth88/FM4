@@ -115,6 +115,20 @@ export default function RepositorySetup() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        if (data.kind === 'llm_trace') {
+          console.groupCollapsed(
+            `[LLM] ${data.operation} | model=${data.model} | files=${data.file_count} | duration=${data.duration_ms}ms`
+          );
+          console.log('Files:', data.files);
+          console.log('Usage:', data.usage);
+          console.log('Response ID:', data.response_id);
+          console.log('Finish Reason:', data.finish_reason);
+          console.log('Input:', data.input);
+          console.log('Output:', data.output);
+          console.log('Raw Output:', data.raw_output);
+          console.groupEnd();
+          return;
+        }
         setAnalysisSteps((prev) => [...prev, data]);
         
         if (data.status === 'completed' && data.step === 'Complete') {

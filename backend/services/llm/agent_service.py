@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Any, Dict, Optional, Sequence
 
 from langchain.agents import create_agent
@@ -36,20 +37,39 @@ class BaseLLMAgentService:
         return bool(os.getenv("OPENAI_API_KEY"))
 
     def invoke(self, user_input: str) -> str:
+        result = self.invoke_with_metadata(user_input)
+        return result["output"]
+
+    def invoke_with_metadata(self, user_input: str) -> Dict[str, Any]:
         if not self.is_enabled():
             raise RuntimeError("OPENAI_API_KEY is not configured")
 
         agent = self._get_agent()
+        started_at = time.perf_counter()
         response = agent.invoke({
             "messages": [
                 {"role": "user", "content": user_input}
             ]
         })
-        return self._extract_output(response)
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        return {
+            "output": self._extract_output(response),
+            "metadata": self._extract_metadata(response, user_input, duration_ms),
+            "raw_response": response,
+        }
 
     def invoke_json(self, user_input: str) -> Any:
-        raw_output = self.invoke(user_input)
-        return self._parse_json_output(raw_output)
+        result = self.invoke_json_with_metadata(user_input)
+        return result["output"]
+
+    def invoke_json_with_metadata(self, user_input: str) -> Dict[str, Any]:
+        result = self.invoke_with_metadata(user_input)
+        parsed_output = self._parse_json_output(result["output"])
+        return {
+            "output": parsed_output,
+            "metadata": result["metadata"],
+            "raw_output": result["output"],
+        }
 
     def _get_agent(self):
         if self._agent is None:
@@ -98,6 +118,59 @@ class BaseLLMAgentService:
                 return output
 
         return str(response)
+
+    def _extract_metadata(self, response: Any, user_input: str, duration_ms: float) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {
+            "model": self.model,
+            "duration_ms": duration_ms,
+            "input_preview": user_input[:4000],
+        }
+
+        usage = None
+        response_id = None
+        finish_reason = None
+
+        if isinstance(response, dict):
+            messages = response.get("messages", [])
+            for message in reversed(messages):
+                usage = getattr(message, "usage_metadata", None) or usage
+                response_meta = getattr(message, "response_metadata", None) or {}
+                if isinstance(response_meta, dict):
+                    finish_reason = response_meta.get("finish_reason", finish_reason)
+                    token_usage = response_meta.get("token_usage")
+                    if token_usage and not usage:
+                        usage = token_usage
+                    response_id = response_meta.get("id", response_id)
+
+        metadata["usage"] = self._normalize_usage(usage)
+        metadata["response_id"] = response_id
+        metadata["finish_reason"] = finish_reason
+        return metadata
+
+    @staticmethod
+    def _normalize_usage(usage: Any) -> Dict[str, Optional[int]]:
+        if not usage:
+            return {
+                "input_tokens": None,
+                "output_tokens": None,
+                "total_tokens": None,
+            }
+
+        if isinstance(usage, dict):
+            input_tokens = usage.get("input_tokens", usage.get("prompt_tokens"))
+            output_tokens = usage.get("output_tokens", usage.get("completion_tokens"))
+            total_tokens = usage.get("total_tokens")
+            return {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
+            }
+
+        return {
+            "input_tokens": None,
+            "output_tokens": None,
+            "total_tokens": None,
+        }
 
     @staticmethod
     def _parse_json_output(raw_output: str) -> Any:

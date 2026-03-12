@@ -18,11 +18,9 @@ class LLMRoleClassifier:
         self,
         ruleset_engine,
         agent_service: Optional[BaseLLMAgentService] = None,
-        max_source_chars: int = 900,
         batch_size: int = 25,
     ):
         self.ruleset_engine = ruleset_engine
-        self.max_source_chars = max_source_chars
         configured_batch_size = int(os.getenv("LLM_CLASSIFICATION_BATCH_SIZE", str(batch_size)))
         self.batch_size = max(1, configured_batch_size)
         self.allowed_roles = set(ruleset_engine.get_role_rules().keys())
@@ -51,22 +49,28 @@ class LLMRoleClassifier:
         return self.agent_service.is_enabled()
 
     def classify_unknown_files(self, files: List[Dict[str, Any]]) -> Dict[str, int]:
+        return self.classify_unknown_files_with_traces(files)["stats"]
+
+    def classify_unknown_files_with_traces(self, files: List[Dict[str, Any]]) -> Dict[str, Any]:
         stats = {
             "attempted": 0,
             "resolved": 0,
             "remaining_unknown": 0,
             "errors": 0,
         }
+        traces: List[Dict[str, Any]] = []
 
         if not self.is_enabled():
             stats["remaining_unknown"] = sum(1 for file in files if file.get("role") == "unknown")
-            return stats
+            return {"stats": stats, "traces": traces}
 
         unknown_files = [file for file in files if file.get("role") == "unknown"]
         for batch in self._chunk_files(unknown_files):
             stats["attempted"] += len(batch)
             try:
-                batch_results = self.classify_batch(batch)
+                batch_response = self.classify_batch(batch)
+                batch_results = batch_response["results"]
+                traces.append(batch_response["trace"])
                 for index, file in enumerate(batch):
                     llm_result = batch_results.get(index)
                     if not llm_result:
@@ -89,11 +93,12 @@ class LLMRoleClassifier:
                     file["role_source"] = "fallback"
                     stats["resolved"] += 1
 
-        return stats
+        return {"stats": stats, "traces": traces}
 
-    def classify_batch(self, files: List[Dict[str, Any]]) -> Dict[int, Dict[str, str]]:
+    def classify_batch(self, files: List[Dict[str, Any]]) -> Dict[str, Any]:
         prompt = self._build_batch_prompt(files)
-        payload = self.agent_service.invoke_json(prompt)
+        response = self.agent_service.invoke_json_with_metadata(prompt)
+        payload = response["output"]
         results = payload.get("results") if isinstance(payload, dict) else payload
         if not isinstance(results, list):
             raise ValueError("LLM batch output did not return a results array")
@@ -106,7 +111,23 @@ class LLMRoleClassifier:
             if not isinstance(index, int) or index < 0 or index >= len(files):
                 continue
             classified[index] = self._normalize_result(files[index], item)
-        return classified
+        return {
+            "results": classified,
+            "trace": {
+                "kind": "llm_trace",
+                "operation": "unknown_file_batch_classification",
+                "file_count": len(files),
+                "files": [self._trim_path(file.get("path")) for file in files],
+                "input": response["metadata"]["input_preview"],
+                "output": payload,
+                "raw_output": response["raw_output"],
+                "model": response["metadata"]["model"],
+                "duration_ms": response["metadata"]["duration_ms"],
+                "usage": response["metadata"]["usage"],
+                "response_id": response["metadata"]["response_id"],
+                "finish_reason": response["metadata"]["finish_reason"],
+            },
+        }
 
     def classify(self, ast: Dict[str, Any]) -> Dict[str, str]:
         return self._normalize_result(ast, self.agent_service.invoke_json(self._build_prompt(ast)))
@@ -158,7 +179,7 @@ class LLMRoleClassifier:
             classes.append(
                 {
                     "name": cls.get("name"),
-                    "methods": [self._compact_signature(method) for method in cls.get("methods", [])[:5]],
+                    "method_signatures": [self._compact_signature(method) for method in cls.get("methods", [])[:8]],
                 }
             )
 
@@ -169,7 +190,6 @@ class LLMRoleClassifier:
             "path_hints": self._path_hints(ast.get("path")),
             "imports": [self._short_import(item) for item in ast.get("imports", [])[:8]],
             "classes": classes,
-            "source_preview": self._compress_source(source)[: self.max_source_chars],
         }
 
     def _build_role_catalog(self) -> str:
@@ -245,11 +265,6 @@ class LLMRoleClassifier:
         cleaned = import_stmt.replace("import", "").replace(";", "").strip()
         parts = [part for part in cleaned.split(".") if part]
         return ".".join(parts[-3:]) if len(parts) > 3 else cleaned
-
-    @staticmethod
-    def _compress_source(source: str) -> str:
-        compact = re.sub(r"\s+", " ", source).strip()
-        return compact[:900]
 
     @staticmethod
     def _path_hints(path: Optional[str]) -> List[str]:
