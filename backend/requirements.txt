@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pydantic
+gitpython
+javalang
+websockets
+tree-sitter==0.21.3
+tree-sitter-languages==1.10.2
+tree_sitter_typescript
+requests
+openai
+python-dotenv
+python-multipart
+uuid
+

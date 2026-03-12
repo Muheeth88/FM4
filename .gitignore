@@ -1,0 +1,85 @@
+############################
+# Backend - Python / FastAPI
+############################
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python build files
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / coverage
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
+
+# SQLite
+*.sqlite3
+
+############################
+# Frontend - React
+############################
+
+# Dependencies
+node_modules/
+
+# Production builds
+build/
+dist/
+
+# Vite
+.vite/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+############################
+# Editor / OS
+############################
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# JetBrains
+.idea/
+
+############################
+# Misc
+############################
+
+*.swp
+*.swo
