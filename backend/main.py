@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 from database.db import init_db
 from routes.repository import router as repository_router
+from routes.analyzer import router as analyzer_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +30,7 @@ app.add_middleware(
 
 # Include routes
 app.include_router(repository_router)
+app.include_router(analyzer_router)
 
 @app.get("/")
 async def root():

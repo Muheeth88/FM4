@@ -13,4 +13,4 @@ python-dotenv
 python-multipart
 uuid
 PyYAML
-
+networkx

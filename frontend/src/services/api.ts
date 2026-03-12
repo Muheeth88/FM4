@@ -28,3 +28,11 @@ export const repositoryApi = {
   getTargetConfig: () =>
     axios.get(`${API_BASE_URL}/repository/config/target`),
 };
+
+export const analyzerApi = {
+  getReport: (projectId: string) =>
+    axios.get(`${API_BASE_URL}/analyzer/${projectId}/report`),
+    
+  getMigrationUnits: (projectId: string) =>
+    axios.get(`${API_BASE_URL}/analyzer/${projectId}/migration-units`),
+};

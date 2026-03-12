@@ -1,0 +1,98 @@
+import logging
+from .repository_scanner import RepositoryScanner
+from .ast_parser import ASTParser
+from .classifier import FileClassifier
+from .dependency_graph import DependencyGraphBuilder
+from .migration_unit_builder import MigrationUnitBuilder
+from .repository_summary import RepositorySummary
+
+logger = logging.getLogger(__name__)
+
+
+class AnalyzerService:
+
+    def __init__(self, ruleset_engine, db):
+        self.ruleset_engine = ruleset_engine
+        self.db = db
+
+        self.scanner = RepositoryScanner()
+        self.parser = ASTParser()
+        self.classifier = FileClassifier(ruleset_engine)
+        self.graph_builder = DependencyGraphBuilder()
+        self.unit_builder = MigrationUnitBuilder(ruleset_engine, db)
+        self.summary_builder = RepositorySummary(db)
+
+    async def analyze_repository(self, project_id, repo_path, progress_callback=None):
+        import asyncio
+
+        async def emit_progress(step_name, status="in_progress", message=""):
+            if progress_callback:
+                await progress_callback({
+                    "step": step_name,
+                    "status": status,
+                    "message": message
+                })
+
+        logger.info("Starting repository analysis")
+        await emit_progress("Initialization", "completed", "Started repository analysis")
+
+        # Step 1 — Discover files
+        await emit_progress("Discovering Files", "in_progress", "Scanning repository for source files")
+        files = self.scanner.discover_files(repo_path)
+        await asyncio.sleep(0.1)
+        await emit_progress("Discovering Files", "completed", f"Found {len(files)} files")
+
+        # Step 2 — Parse AST
+        await emit_progress("Parsing AST", "in_progress", "Parsing Abstract Syntax Trees")
+        ast_results = []
+        for file in files:
+            ast_data = self.parser.parse(file)
+            ast_results.append(ast_data)
+            await asyncio.sleep(0) # yield control
+        await emit_progress("Parsing AST", "completed", f"Parsed {len(ast_results)} ASTs")
+
+        # Step 3 — Classify files
+        await emit_progress("Classifying Files", "in_progress", "Assigning roles to files")
+        classified_files = []
+        for ast in ast_results:
+            role = self.classifier.classify(ast)
+            ast["role"] = role
+            classified_files.append(ast)
+            await asyncio.sleep(0) # yield control
+
+        # Persist files
+        file_ids = self.db.insert_files(project_id, classified_files)
+        await emit_progress("Classifying Files", "completed", f"Classified and saved files")
+
+        # Step 4 — Build dependency graph
+        await emit_progress("Building Graph", "in_progress", "Constructing dependency graph")
+        graph = self.graph_builder.build(classified_files)
+        self.db.insert_dependencies(project_id, graph)
+        await asyncio.sleep(0)
+        await emit_progress("Building Graph", "completed", "Dependency graph built")
+
+        # Step 5 — Topological sort
+        await emit_progress("Topological Sort", "in_progress", "Sorting migration order")
+        order = self.graph_builder.topological_sort(graph)
+        await asyncio.sleep(0)
+        await emit_progress("Topological Sort", "completed", "Sorted dependencies")
+
+        # Step 6 — Create migration units
+        await emit_progress("Migration Units", "in_progress", "Creating migration units")
+        self.unit_builder.create_units(
+            project_id,
+            classified_files,
+            order
+        )
+        await asyncio.sleep(0)
+        await emit_progress("Migration Units", "completed", "Migration units stored")
+
+        # Step 7 — Build repository summary
+        await emit_progress("Generating Summary", "in_progress", "Aggregating file metrics")
+        self.summary_builder.generate(project_id)
+        await asyncio.sleep(0)
+        await emit_progress("Generating Summary", "completed", "Summary generated")
+
+        logger.info("Repository analysis completed")
+        await emit_progress("Complete", "completed", "Repository analysis finished!")
+        return True

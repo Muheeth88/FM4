@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Trash2, Folder, GitBranch, Code, Layers } from 'lucide-react';
+import { Trash2, Folder, GitBranch, Code, Layers, Activity } from 'lucide-react';
 import { repositoryApi } from '../services/api';
+import AnalysisReport from './AnalysisReport';
 import './MigrationProjectList.css';
 
 interface Config {
@@ -23,6 +24,7 @@ export default function MigrationProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeProject, setActiveProject] = useState<string | null>(null);
 
   useEffect(() => {
     loadProjects();
@@ -59,11 +61,17 @@ export default function MigrationProjectList() {
     );
   }
 
-
-  if (loading) {
+  if (activeProject) {
     return (
       <div className="projects-container">
-        <div className="loading">Loading projects...</div>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => setActiveProject(null)}
+          style={{marginBottom: '20px'}}
+        >
+          &larr; Back to Projects
+        </button>
+        <AnalysisReport projectId={activeProject} />
       </div>
     );
   }
@@ -162,6 +170,14 @@ export default function MigrationProjectList() {
               </div>
 
               <div className="project-actions">
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => setActiveProject(project.id)}
+                  style={{marginRight: '12px'}}
+                >
+                  <Activity size={16} />
+                  View Dashboard
+                </button>
                 <button className="btn-delete">
                   <Trash2 size={16} />
                   Delete Project

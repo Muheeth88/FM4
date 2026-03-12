@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { repositoryApi } from '../services/api';
+import AnalysisReport from './AnalysisReport';
 import './RepositorySetup.css';
 
 interface Branch {
@@ -27,6 +28,10 @@ export default function RepositorySetup() {
   const [creating, setCreating] = useState(false);
   const [projectCreated, setProjectCreated] = useState(false);
   const [projectId, setProjectId] = useState('');
+
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [analysisSteps, setAnalysisSteps] = useState<any[]>([]);
 
   useEffect(() => {
     loadConfigs();
@@ -95,6 +100,47 @@ export default function RepositorySetup() {
     }
   };
 
+  const handleAnalyze = () => {
+    setAnalyzing(true);
+    setAnalysisSteps([]);
+    setError('');
+    
+    // Construct WebSocket URL dynamically
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // Use localhost:8000 as configured in api.ts
+    const wsUrl = `${wsProtocol}//localhost:8000/api/analyzer/${projectId}/ws`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setAnalysisSteps((prev) => [...prev, data]);
+        
+        if (data.status === 'completed' && data.step === 'Complete') {
+          setAnalyzing(false);
+          setAnalysisComplete(true);
+          ws.close();
+        } else if (data.status === 'failed') {
+          setAnalyzing(false);
+          setError(data.error || 'Analysis failed');
+          ws.close();
+        }
+      } catch (err) {
+        console.error('Error parsing websocket message:', err);
+      }
+    };
+    
+    ws.onerror = (error) => {
+      setAnalyzing(false);
+      setError('WebSocket connection error. Make sure the backend is running.');
+      console.error('WebSocket Error:', error);
+    };
+  };
+
+  if (analysisComplete) {
+    return <AnalysisReport projectId={projectId} />;
+  }
 
   if (projectCreated) {
     return (
@@ -108,7 +154,43 @@ export default function RepositorySetup() {
             <p><code>workspace/{projectId}/source</code> - Repository cloned here</p>
             <p><code>workspace/{projectId}/target</code> - Generated files will go here</p>
           </div>
+          
+          {error && (
+            <div className="alert alert-error" style={{marginBottom: '20px'}}>
+              <AlertCircle size={20} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {analyzing && (
+            <div className="analysis-progress">
+              <h3>Analysis Progress</h3>
+              <div className="progress-steps">
+                {analysisSteps.map((step, idx) => (
+                  <div key={idx} className={`progress-step ${step.status}`}>
+                    {step.status === 'in_progress' ? <Loader size={16} className="spinner" /> : <CheckCircle size={16} />}
+                    <span><strong>{step.step}:</strong> {step.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="button-group">
+            <button
+              className="btn btn-primary"
+              onClick={handleAnalyze}
+              disabled={analyzing}
+            >
+              {analyzing ? (
+                <>
+                  <Loader size={18} className="spinner" />
+                  Analyzing...
+                </>
+              ) : (
+                'Analyze Source Repo'
+              )}
+            </button>
             <button
               className="btn btn-secondary"
               onClick={() => {
@@ -119,7 +201,10 @@ export default function RepositorySetup() {
                 setVerified(false);
                 setProjectCreated(false);
                 setProjectId('');
+                setAnalysisComplete(false);
+                setAnalysisSteps([]);
               }}
+              disabled={analyzing}
             >
               Create Another Project
             </button>

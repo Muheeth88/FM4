@@ -52,6 +52,52 @@ def init_db():
     )
     ''')
     
+    # Files table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id TEXT NOT NULL,
+        path TEXT NOT NULL,
+        role TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # Dependencies table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS dependencies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id TEXT NOT NULL,
+        from_file_path TEXT NOT NULL,
+        to_file_path TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # Migration Units table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS migration_units (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id TEXT NOT NULL,
+        source_path TEXT NOT NULL,
+        role TEXT NOT NULL,
+        target_path TEXT NOT NULL,
+        import_alias TEXT,
+        iteration INTEGER,
+        status TEXT DEFAULT 'pending',
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # Repository Summary table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS repository_summary (
+        project_id TEXT PRIMARY KEY,
+        summary_json TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+    ''')
+
     conn.commit()
     conn.close()
 
