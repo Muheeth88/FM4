@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { RotateCcw, List } from 'lucide-react'
 import RepositorySetup from './components/RepositorySetup'
 import MigrationProjectList from './components/MigrationProjectList'

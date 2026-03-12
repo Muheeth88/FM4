@@ -36,8 +36,7 @@ class LLMRoleClassifier:
                 "You classify repository files into one allowed migration role.\n"
                 "Always call the get_available_roles tool before deciding.\n"
                 "Choose exactly one closest supported role from the allowed roles.\n"
-                "Do not return unknown for normal repository code.\n"
-                "If a file is a data holder, enum, helper, config-like class, or support artifact, map it to the nearest supported role.\n"
+                "Classify the actual technical role of the file, not whether it is infra or test.\n"
                 "Return only JSON with this schema: "
                 '{"role":"<allowed role>","confidence":"low|medium|high","reason":"short explanation"}'
             ),
@@ -61,10 +60,10 @@ class LLMRoleClassifier:
         traces: List[Dict[str, Any]] = []
 
         if not self.is_enabled():
-            stats["remaining_unknown"] = sum(1 for file in files if file.get("role") == "unknown")
+            stats["remaining_unknown"] = sum(1 for file in files if file.get("actual_role") == "unknown")
             return {"stats": stats, "traces": traces}
 
-        unknown_files = [file for file in files if file.get("role") == "unknown"]
+        unknown_files = [file for file in files if file.get("actual_role") == "unknown"]
         for batch in self._chunk_files(unknown_files):
             stats["attempted"] += len(batch)
             try:
@@ -76,21 +75,21 @@ class LLMRoleClassifier:
                     if not llm_result:
                         llm_result = self._fallback_result(file, "Batch result missing for file")
 
-                    role = llm_result["role"]
-                    file["role_reason"] = llm_result.get("reason")
-                    file["role_confidence"] = llm_result.get("confidence", "low")
-                    file["role_source"] = "llm"
-                    file["role"] = role
+                    actual_role = llm_result["role"]
+                    file["actual_role_reason"] = llm_result.get("reason")
+                    file["actual_role_confidence"] = llm_result.get("confidence", "low")
+                    file["actual_role_source"] = "llm"
+                    file["actual_role"] = actual_role
                     stats["resolved"] += 1
             except Exception as exc:
                 logger.warning("LLM batch classification failed: %s", exc)
                 stats["errors"] += len(batch)
                 for file in batch:
                     fallback = self._fallback_result(file, f"LLM batch failed: {exc}")
-                    file["role"] = fallback["role"]
-                    file["role_reason"] = fallback["reason"]
-                    file["role_confidence"] = fallback["confidence"]
-                    file["role_source"] = "fallback"
+                    file["actual_role"] = fallback["role"]
+                    file["actual_role_reason"] = fallback["reason"]
+                    file["actual_role_confidence"] = fallback["confidence"]
+                    file["actual_role_source"] = "fallback"
                     stats["resolved"] += 1
 
         return {"stats": stats, "traces": traces}
@@ -219,8 +218,8 @@ class LLMRoleClassifier:
         file_name = self._file_name(ast.get("path")).lower()
         source = (ast.get("source") or "").lower()
 
-        if any(token in path for token in ("/config/", ".properties")) or "config" in file_name:
-            return "config_files"
+        if "@test" in source or "org.testng" in source or "junit" in source:
+            return "test_files"
         if any(token in path for token in ("/api/",)) or any(token in file_name for token in ("api", "http", "request", "response")):
             return "api_services"
         if any(token in path for token in ("/exception/", "/utils/", "/support/", "/constants/")):
@@ -235,9 +234,8 @@ class LLMRoleClassifier:
             return "page_components"
         if "/pages/" in path or "page" in file_name:
             return "page_objects"
-        if "@test" in source or "org.testng" in source:
-            return "test_files"
-
+        if "config" in file_name or "/config/" in path or ".properties" in path:
+            return "config_files"
         return "utilities"
 
     def _fallback_result(self, ast: Dict[str, Any], reason: str) -> Dict[str, str]:

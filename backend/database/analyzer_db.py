@@ -35,9 +35,9 @@ class AnalyzerDBWrapper:
         try:
             for file in classified_files:
                 cursor.execute('''
-                INSERT INTO files (project_id, path, role)
-                VALUES (?, ?, ?)
-                ''', (project_id, file["path"], file["role"]))
+                INSERT INTO files (project_id, path, actual_role, file_type)
+                VALUES (?, ?, ?, ?)
+                ''', (project_id, file["path"], file["actual_role"], file["file_type"]))
                 ids.append(cursor.lastrowid)
             conn.commit()
         except Exception as e:
@@ -72,13 +72,13 @@ class AnalyzerDBWrapper:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-            INSERT INTO migration_units (project_id, source_path, role, target_path, import_alias, iteration, status)
+            INSERT INTO migration_units (project_id, source_path, actual_role, file_type, import_alias, iteration, status)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 unit["project_id"],
                 unit["source_path"],
-                unit["role"],
-                unit["target_path"],
+                unit["actual_role"],
+                unit["file_type"],
                 unit["import_alias"],
                 unit["iteration"],
                 unit["status"]
@@ -96,11 +96,12 @@ class AnalyzerDBWrapper:
         cursor = conn.cursor()
         files = []
         try:
-            cursor.execute('SELECT path, role FROM files WHERE project_id = ?', (project_id,))
+            cursor.execute('SELECT path, actual_role, file_type FROM files WHERE project_id = ?', (project_id,))
             for row in cursor.fetchall():
                 files.append({
                     "path": row[0],
-                    "role": row[1]
+                    "actual_role": row[1],
+                    "file_type": row[2]
                 })
         except Exception as e:
             logger.error(f"Error getting files: {e}")

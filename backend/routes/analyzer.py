@@ -97,14 +97,14 @@ async def get_migration_units(project_id: str):
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT id, source_path, role, target_path, status, iteration FROM migration_units WHERE project_id = ? ORDER BY iteration ASC", (project_id,))
+        cursor.execute("SELECT id, source_path, actual_role, file_type, status, iteration FROM migration_units WHERE project_id = ? ORDER BY file_type ASC, iteration ASC", (project_id,))
         units = []
         for row in cursor.fetchall():
             units.append({
                 "id": row[0],
                 "source_path": row[1],
-                "role": row[2],
-                "target_path": row[3],
+                "actual_role": row[2],
+                "file_type": row[3],
                 "status": row[4],
                 "iteration": row[5]
             })

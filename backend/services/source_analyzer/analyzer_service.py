@@ -57,16 +57,17 @@ class AnalyzerService:
         await emit_progress("Classifying Files", "in_progress", "Assigning roles to files")
         classified_files = []
         for ast in ast_results:
-            role = self.classifier.classify(ast)
-            ast["role"] = role
-            ast["role_source"] = "deterministic"
+            actual_role = self.classifier.classify(ast)
+            ast["actual_role"] = actual_role
+            ast["actual_role_source"] = "deterministic"
+            ast["file_type"] = self.classifier.classify_file_type(ast, actual_role)
             classified_files.append(ast)
             await asyncio.sleep(0) # yield control
 
         await emit_progress("Classifying Files", "completed", "Deterministic classification complete")
 
         # Step 4 — Build dependency graph
-        unknown_files = [file for file in classified_files if file.get("role") == "unknown"]
+        unknown_files = [file for file in classified_files if file.get("actual_role") == "unknown"]
         if unknown_files:
             await emit_progress(
                 "LLM Classification",
@@ -89,6 +90,12 @@ class AnalyzerService:
         else:
             await emit_progress("LLM Classification", "completed", "No unknown files required LLM classification")
 
+        for file in classified_files:
+            if file.get("actual_role") == "unknown":
+                file["actual_role"] = "utilities"
+                file["actual_role_source"] = "fallback"
+            file["file_type"] = self.classifier.classify_file_type(file, file["actual_role"])
+
         self.db.clear_project_analysis(project_id)
         self.db.insert_files(project_id, classified_files)
 
@@ -99,8 +106,11 @@ class AnalyzerService:
         await emit_progress("Building Graph", "completed", "Dependency graph built")
 
         # Step 5 — Topological sort
-        await emit_progress("Topological Sort", "in_progress", "Sorting migration order")
-        order = self.graph_builder.topological_sort(graph)
+        await emit_progress("Topological Sort", "in_progress", "Sorting infra and test migration orders")
+        ordered_groups = {
+            "infra_file": self.graph_builder.topological_sort_for_role(graph, classified_files, "infra_file"),
+            "test_file": self.graph_builder.topological_sort_for_role(graph, classified_files, "test_file"),
+        }
         await asyncio.sleep(0)
         await emit_progress("Topological Sort", "completed", "Sorted dependencies")
 
@@ -109,7 +119,7 @@ class AnalyzerService:
         self.unit_builder.create_units(
             project_id,
             classified_files,
-            order
+            ordered_groups
         )
         await asyncio.sleep(0)
         await emit_progress("Migration Units", "completed", "Migration units stored")

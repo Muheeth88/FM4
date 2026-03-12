@@ -52,16 +52,7 @@ def init_db():
     )
     ''')
     
-    # Files table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS files (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_id TEXT NOT NULL,
-        path TEXT NOT NULL,
-        role TEXT NOT NULL,
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-    )
-    ''')
+    _ensure_files_table(cursor)
 
     # Dependencies table
     cursor.execute('''
@@ -74,20 +65,7 @@ def init_db():
     )
     ''')
 
-    # Migration Units table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS migration_units (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_id TEXT NOT NULL,
-        source_path TEXT NOT NULL,
-        role TEXT NOT NULL,
-        target_path TEXT NOT NULL,
-        import_alias TEXT,
-        iteration INTEGER,
-        status TEXT DEFAULT 'pending',
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-    )
-    ''')
+    _ensure_migration_units_table(cursor)
 
     # Repository Summary table
     cursor.execute('''
@@ -100,6 +78,130 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+def _ensure_migration_units_table(cursor):
+    cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'migration_units'")
+    exists = cursor.fetchone() is not None
+
+    if not exists:
+        cursor.execute('''
+        CREATE TABLE migration_units (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL,
+            source_path TEXT NOT NULL,
+            actual_role TEXT NOT NULL,
+            file_type TEXT NOT NULL,
+            import_alias TEXT,
+            iteration INTEGER,
+            status TEXT DEFAULT 'pending',
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+        ''')
+        return
+
+    cursor.execute("PRAGMA table_info(migration_units)")
+    columns = [row[1] for row in cursor.fetchall()]
+    desired_columns = ["id", "project_id", "source_path", "actual_role", "file_type", "import_alias", "iteration", "status"]
+
+    if columns == desired_columns:
+        return
+
+    cursor.execute("ALTER TABLE migration_units RENAME TO migration_units_old")
+    cursor.execute('''
+    CREATE TABLE migration_units (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id TEXT NOT NULL,
+        source_path TEXT NOT NULL,
+        actual_role TEXT NOT NULL,
+        file_type TEXT NOT NULL,
+        import_alias TEXT,
+        iteration INTEGER,
+        status TEXT DEFAULT 'pending',
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+    ''')
+
+    old_columns = set(columns)
+    if {"id", "project_id", "source_path", "iteration", "status"}.issubset(old_columns):
+        if {"actual_role", "file_type", "import_alias"}.issubset(old_columns):
+            cursor.execute('''
+            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, import_alias, iteration, status)
+            SELECT id, project_id, source_path, actual_role, file_type, import_alias, iteration, status
+            FROM migration_units_old
+            ''')
+        elif {"actual_role", "file_type"}.issubset(old_columns):
+            cursor.execute('''
+            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, import_alias, iteration, status)
+            SELECT id, project_id, source_path, actual_role, file_type, '' AS import_alias, iteration, status
+            FROM migration_units_old
+            ''')
+        elif {"role", "import_alias"}.issubset(old_columns):
+            cursor.execute('''
+            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, import_alias, iteration, status)
+            SELECT id, project_id, source_path, role, 'infra_file', import_alias, iteration, status
+            FROM migration_units_old
+            ''')
+        elif "role" in old_columns:
+            cursor.execute('''
+            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, import_alias, iteration, status)
+            SELECT id, project_id, source_path, role, 'infra_file', '' AS import_alias, iteration, status
+            FROM migration_units_old
+            ''')
+
+    cursor.execute("DROP TABLE migration_units_old")
+
+def _ensure_files_table(cursor):
+    cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'files'")
+    exists = cursor.fetchone() is not None
+
+    if not exists:
+        cursor.execute('''
+        CREATE TABLE files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL,
+            path TEXT NOT NULL,
+            actual_role TEXT NOT NULL,
+            file_type TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+        ''')
+        return
+
+    cursor.execute("PRAGMA table_info(files)")
+    columns = [row[1] for row in cursor.fetchall()]
+    desired_columns = ["id", "project_id", "path", "actual_role", "file_type"]
+
+    if columns == desired_columns:
+        return
+
+    cursor.execute("ALTER TABLE files RENAME TO files_old")
+    cursor.execute('''
+    CREATE TABLE files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id TEXT NOT NULL,
+        path TEXT NOT NULL,
+        actual_role TEXT NOT NULL,
+        file_type TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+    ''')
+
+    old_columns = set(columns)
+    if {"id", "project_id", "path"}.issubset(old_columns):
+        if {"actual_role", "file_type"}.issubset(old_columns):
+            cursor.execute('''
+            INSERT INTO files (id, project_id, path, actual_role, file_type)
+            SELECT id, project_id, path, actual_role, file_type
+            FROM files_old
+            ''')
+        elif "role" in old_columns:
+            cursor.execute('''
+            INSERT INTO files (id, project_id, path, actual_role, file_type)
+            SELECT id, project_id, path, role, 'infra_file'
+            FROM files_old
+            ''')
+
+    cursor.execute("DROP TABLE files_old")
 
 if __name__ == "__main__":
     init_db()

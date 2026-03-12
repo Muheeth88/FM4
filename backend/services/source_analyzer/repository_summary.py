@@ -4,28 +4,25 @@ class RepositorySummary:
         self.db = db
 
     def generate(self, project_id):
-
         files = self.db.get_files(project_id)
-
         roles = {}
         categories = {
-            "tests": 0,
-            "helpers": 0
+            "test_files": 0,
+            "infra_files": 0
         }
-        
-        test_roles = ["test_files", "test_data"]
 
         for f in files:
-            role = f["role"]
+            actual_role = f["actual_role"]
+            file_type = f["file_type"]
 
-            if role not in roles:
-                roles[role] = 0
-            roles[role] += 1
+            if actual_role not in roles:
+                roles[actual_role] = 0
+            roles[actual_role] += 1
             
-            if role in test_roles:
-                categories["tests"] += 1
+            if file_type == "test_file":
+                categories["test_files"] += 1
             else:
-                categories["helpers"] += 1
+                categories["infra_files"] += 1
 
         summary = {
             "file_counts": roles,
