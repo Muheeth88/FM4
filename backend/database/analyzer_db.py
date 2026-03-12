@@ -7,6 +7,24 @@ logger = logging.getLogger(__name__)
 
 class AnalyzerDBWrapper:
     """Wrapper class providing the exact DB interface expected by AnalyzerService."""
+
+    @staticmethod
+    def clear_project_analysis(project_id: str):
+        """Remove previous analysis artifacts so reruns replace, not append."""
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM migration_units WHERE project_id = ?', (project_id,))
+            cursor.execute('DELETE FROM dependencies WHERE project_id = ?', (project_id,))
+            cursor.execute('DELETE FROM files WHERE project_id = ?', (project_id,))
+            cursor.execute('DELETE FROM repository_summary WHERE project_id = ?', (project_id,))
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Error clearing analysis data: {e}")
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
     
     @staticmethod
     def insert_files(project_id: str, classified_files: List[Dict[str, Any]]) -> List[int]:

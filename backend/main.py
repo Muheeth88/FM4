@@ -1,7 +1,8 @@
-from dotenv import load_dotenv
-import os
+from pathlib import Path
 
-load_dotenv()
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).with_name(".env"))
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware

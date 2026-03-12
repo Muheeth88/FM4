@@ -14,3 +14,5 @@ python-multipart
 uuid
 PyYAML
 networkx
+langchain
+langchain-openai

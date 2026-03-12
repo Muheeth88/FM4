@@ -2,6 +2,7 @@ import logging
 from .repository_scanner import RepositoryScanner
 from .ast_parser import ASTParser
 from .classifier import FileClassifier
+from .llm_role_classifier import LLMRoleClassifier
 from .dependency_graph import DependencyGraphBuilder
 from .migration_unit_builder import MigrationUnitBuilder
 from .repository_summary import RepositorySummary
@@ -18,6 +19,7 @@ class AnalyzerService:
         self.scanner = RepositoryScanner()
         self.parser = ASTParser()
         self.classifier = FileClassifier(ruleset_engine)
+        self.llm_classifier = LLMRoleClassifier(ruleset_engine)
         self.graph_builder = DependencyGraphBuilder()
         self.unit_builder = MigrationUnitBuilder(ruleset_engine, db)
         self.summary_builder = RepositorySummary(db)
@@ -57,14 +59,35 @@ class AnalyzerService:
         for ast in ast_results:
             role = self.classifier.classify(ast)
             ast["role"] = role
+            ast["role_source"] = "deterministic"
             classified_files.append(ast)
             await asyncio.sleep(0) # yield control
 
-        # Persist files
-        file_ids = self.db.insert_files(project_id, classified_files)
-        await emit_progress("Classifying Files", "completed", f"Classified and saved files")
+        await emit_progress("Classifying Files", "completed", "Deterministic classification complete")
 
         # Step 4 — Build dependency graph
+        unknown_files = [file for file in classified_files if file.get("role") == "unknown"]
+        if unknown_files:
+            await emit_progress(
+                "LLM Classification",
+                "in_progress",
+                f"Resolving {len(unknown_files)} unknown files with LLM",
+            )
+            llm_stats = await asyncio.to_thread(self.llm_classifier.classify_unknown_files, unknown_files)
+            if not self.llm_classifier.is_enabled():
+                llm_message = "Skipped because OPENAI_API_KEY is not configured"
+            else:
+                llm_message = (
+                    f"Resolved {llm_stats['resolved']} files, "
+                    f"{llm_stats['remaining_unknown']} remain unknown"
+                )
+            await emit_progress("LLM Classification", "completed", llm_message)
+        else:
+            await emit_progress("LLM Classification", "completed", "No unknown files required LLM classification")
+
+        self.db.clear_project_analysis(project_id)
+        self.db.insert_files(project_id, classified_files)
+
         await emit_progress("Building Graph", "in_progress", "Constructing dependency graph")
         graph = self.graph_builder.build(classified_files)
         self.db.insert_dependencies(project_id, graph)
