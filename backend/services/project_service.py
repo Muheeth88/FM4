@@ -2,8 +2,13 @@ import sqlite3
 from typing import Optional, Dict, List
 from database.db import get_db
 import logging
+import yaml
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+WORKSPACE_BASE = Path(__file__).parent.parent / "workspace"
+RULESETS_DIR = Path(__file__).parent.parent / "rulesets"
 
 class ProjectService:
     """Service for project database operations"""
@@ -38,9 +43,53 @@ class ProjectService:
             conn.commit()
             conn.close()
             logger.info(f"Project {project_id} created successfully")
+            
+            # Initialize target structure
+            if not ProjectService.setup_target_structure(project_id):
+                logger.error(f"Failed to initialize target structure for project {project_id}")
+                return False
+            
             return True
         except Exception as e:
             logger.error(f"Failed to create project: {str(e)}")
+            return False
+    
+    @staticmethod
+    def setup_target_structure(project_id: str, ruleset_name: str = "selenium_java_to_playwright_ts.yaml") -> bool:
+        """Initialize the target folder structure based on ruleset config"""
+        try:
+            ruleset_path = RULESETS_DIR / ruleset_name
+            if not ruleset_path.exists():
+                logger.error(f"Ruleset not found: {ruleset_path}")
+                return False
+            
+            with open(ruleset_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            
+            target_structure = config.get('target_structure', {})
+            if not target_structure:
+                logger.warning(f"No target_structure found in {ruleset_name}")
+                return True
+            
+            target_path = WORKSPACE_BASE / project_id / "target"
+            target_path.mkdir(parents=True, exist_ok=True)
+            
+            def create_recursive(current_path: Path, structure: dict):
+                for name, content in structure.items():
+                    new_path = current_path / name
+                    new_path.mkdir(exist_ok=True)
+                    
+                    # Create .gitkeep to ensure the folder is tracked by Git
+                    (new_path / ".gitkeep").touch()
+                    
+                    if isinstance(content, dict) and content:
+                        create_recursive(new_path, content)
+            
+            create_recursive(target_path, target_structure)
+            logger.info(f"Created target structure for project {project_id} using {ruleset_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error setting up target structure: {str(e)}")
             return False
     
     @staticmethod

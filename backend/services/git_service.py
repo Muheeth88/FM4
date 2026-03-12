@@ -77,7 +77,6 @@ class GitService:
             target_dir = project_dir / "target"
             
             source_dir.mkdir(parents=True, exist_ok=True)
-            target_dir.mkdir(parents=True, exist_ok=True)
             
             # Clone repository
             auth_url = repo_url

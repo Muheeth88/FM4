@@ -35,6 +35,9 @@ htmlcov/
 # SQLite
 *.sqlite3
 
+# Workspace
+workspace/
+
 ############################
 # Frontend - React
 ############################

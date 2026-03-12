@@ -1,0 +1,194 @@
+id: java-selenium-testng_to_playwright-ts
+
+source:
+  language: java
+  frameworks:
+    - selenium
+    - testng
+
+target:
+  language: typescript
+  framework: playwright
+
+# ------------------------------------------------
+# TARGET PROJECT STRUCTURE
+# This section is used to generate the framework
+# skeleton when user clicks "Generate Target".
+# ------------------------------------------------
+
+target_structure:
+
+  tests:
+    ui: {}
+    api: {}
+    e2e: {}
+
+  pages:
+    components: {}
+
+  services: {}
+
+  fixtures: {}
+
+  utils: {}
+
+  ai: {}
+
+  test-data: {}
+
+  config: {}
+
+  reporters: {}
+
+  pipelines: {}
+
+  docs: {}
+
+# ------------------------------------------------
+# FILE CLASSIFICATION
+# Determines where migrated files should go
+# ------------------------------------------------
+
+classification:
+
+  test_files:
+    indicators:
+      - "@Test"
+      - "org.testng"
+    target_folder: tests/ui
+
+  page_objects:
+    indicators:
+      - "WebElement"
+      - "By."
+      - "driver.findElement"
+    target_folder: pages
+
+  page_components:
+    indicators:
+      - "Header"
+      - "Menu"
+      - "Component"
+    target_folder: pages/components
+
+  api_services:
+    indicators:
+      - "RestAssured"
+      - "HttpClient"
+    target_folder: services
+
+  utilities:
+    indicators:
+      - "Utils"
+      - "Helper"
+      - "Logger"
+    target_folder: utils
+
+  base_classes:
+    indicators:
+      - "BaseTest"
+      - "DriverManager"
+    target_folder: fixtures
+
+  config_files:
+    indicators:
+      - ".properties"
+      - "Config"
+    target_folder: config
+
+  test_data:
+    indicators:
+      - "DataProvider"
+      - "testdata"
+    target_folder: test-data
+
+# ------------------------------------------------
+# LOCATOR TRANSFORMATION
+# ------------------------------------------------
+
+locators:
+
+  "By.id":
+    template: "page.locator('#{value}')"
+
+  "By.name":
+    template: "page.locator('[name=\"{value}\"]')"
+
+  "By.xpath":
+    template: "page.locator('{value}')"
+
+  "By.cssSelector":
+    template: "page.locator('{value}')"
+
+  "By.className":
+    template: "page.locator('.{value}')"
+
+  "By.linkText":
+    template: "page.getByText('{value}')"
+
+# ------------------------------------------------
+# ACTION TRANSFORMATIONS
+# ------------------------------------------------
+
+actions:
+
+  open_url:
+    source: "driver.get("
+    target: "await page.goto("
+
+  click:
+    source: ".click()"
+    target: ".click()"
+
+  type:
+    source: ".sendKeys("
+    target: ".fill("
+
+  get_text:
+    source: ".getText()"
+    target: ".textContent()"
+
+  find_element:
+    source: "driver.findElement"
+    target: "page.locator"
+
+# ------------------------------------------------
+# TESTNG -> PLAYWRIGHT TEST MAPPING
+# ------------------------------------------------
+
+test_mapping:
+
+  "@Test": "test"
+
+  "@BeforeMethod": "test.beforeEach"
+
+  "@AfterMethod": "test.afterEach"
+
+  "@BeforeClass": "test.beforeAll"
+
+  "@AfterClass": "test.afterAll"
+
+  "Assert.assertEquals": "expect().toBe"
+
+  "Assert.assertTrue": "expect().toBeTruthy"
+
+# ------------------------------------------------
+# FILE NAMING RULES
+# ------------------------------------------------
+
+naming:
+
+  tests:
+    suffix: ".spec.ts"
+
+  pages:
+    suffix: "Page.ts"
+
+  components:
+    suffix: "Component.ts"
+
+  services:
+    suffix: "Service.ts"
+
+  utils:
+    suffix: ".ts"
