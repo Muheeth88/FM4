@@ -77,13 +77,16 @@ class ProjectService:
             def create_recursive(current_path: Path, structure: dict):
                 for name, content in structure.items():
                     new_path = current_path / name
-                    new_path.mkdir(exist_ok=True)
-                    
-                    # Create .gitkeep to ensure the folder is tracked by Git
-                    (new_path / ".gitkeep").touch()
-                    
-                    if isinstance(content, dict) and content:
-                        create_recursive(new_path, content)
+                    if isinstance(content, dict):
+                        # It's a directory
+                        new_path.mkdir(exist_ok=True)
+                        # Create .gitkeep to ensure the folder is tracked by Git
+                        (new_path / ".gitkeep").touch()
+                        if content:
+                            create_recursive(new_path, content)
+                    else:
+                        # It's a file
+                        new_path.touch()
             
             create_recursive(target_path, target_structure)
             logger.info(f"Created target structure for project {project_id} using {ruleset_name}")

@@ -18,31 +18,28 @@ target:
 
 target_structure:
 
-  tests:
-    ui: {}
-    api: {}
-    e2e: {}
-
-  pages:
-    components: {}
-
-  services: {}
-
-  fixtures: {}
-
-  utils: {}
-
-  ai: {}
-
-  test-data: {}
-
-  config: {}
-
-  reporters: {}
+  src:
+    tests:
+      ui: {}
+      api: {}
+      e2e: {}
+    pages:
+      components: {}
+    services: {}
+    fixtures: {}
+    utils: {}
+    ai: {}
+    test-data: {}
+    config: {}
+    reporters: {}
 
   pipelines: {}
-
   docs: {}
+  
+  package.json: ""
+  playwright.config.ts: ""
+  tsconfig.json: ""
+  .gitignore: ""
 
 # ------------------------------------------------
 # FILE CLASSIFICATION
