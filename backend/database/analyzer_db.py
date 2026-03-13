@@ -72,13 +72,15 @@ class AnalyzerDBWrapper:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-            INSERT INTO migration_units (project_id, source_path, actual_role, file_type, import_alias, iteration, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO migration_units (project_id, source_path, actual_role, file_type, target_path, migration_action, import_alias, iteration, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 unit["project_id"],
                 unit["source_path"],
                 unit["actual_role"],
                 unit["file_type"],
+                unit["target_path"],
+                unit["migration_action"],
                 unit["import_alias"],
                 unit["iteration"],
                 unit["status"]

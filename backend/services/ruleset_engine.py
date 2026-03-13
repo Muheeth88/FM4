@@ -24,6 +24,44 @@ class RulesetEngine:
         """Returns the classification configuration block."""
         return self.ruleset.get("classification", {})
 
+    def resolve_target_path_for_file(self, source_path: str, role: str) -> str:
+        normalized_source = source_path.replace("\\", "/")
+        lowercase_source = normalized_source.lower()
+        filename = os.path.basename(normalized_source)
+
+        if lowercase_source.endswith("/pom.xml"):
+            return "analysis/pom.xml"
+
+        if filename == ".gitignore":
+            return ".gitignore"
+
+        if "/infra/" in lowercase_source:
+            return f"infra/{normalized_source.split('/infra/', 1)[1]}"
+
+        resources_marker = "/resources/"
+        if resources_marker in lowercase_source:
+            prefix, suffix = normalized_source.split("/resources/", 1)
+            resources_root = prefix.split("/")[-1]
+            if resources_root == "test":
+                return f"src/test/resources/{suffix}"
+            if resources_root == "main":
+                return f"src/main/resources/{suffix}"
+            return f"resources/{suffix}"
+
+        return self.resolve_target_path(role, filename)
+
+    def determine_migration_action(self, source_path: str, role: str) -> str:
+        normalized_source = source_path.replace("\\", "/").lower()
+        filename = normalized_source.rsplit("/", 1)[-1]
+
+        if filename == "pom.xml":
+            return "analyze_only"
+
+        if filename == ".gitignore" or "/infra/" in normalized_source or "/resources/" in normalized_source:
+            return "copy"
+
+        return "migrate"
+
     def resolve_target_path(self, role: str, filename: str) -> str:
         """
         Resolves target path based on role and filename using the YAML schema.

@@ -37,6 +37,8 @@ interface MigrationUnit {
   source_path: string;
   actual_role: string;
   file_type: string;
+  target_path: string;
+  migration_action: string;
   status: string;
   iteration: number;
 }
@@ -104,6 +106,16 @@ function MigrationTable({
                           <div className="expanded-path">
                             <strong>Path:</strong>
                             <code className="path-code" style={{marginLeft: '10px'}}>{unit.source_path}</code>
+                          </div>
+
+                          <div className="expanded-path">
+                            <strong>Target:</strong>
+                            <code className="path-code" style={{marginLeft: '10px'}}>{unit.target_path || 'Not resolved'}</code>
+                          </div>
+
+                          <div className="expanded-path">
+                            <strong>Action:</strong>
+                            <code className="path-code" style={{marginLeft: '10px'}}>{unit.migration_action}</code>
                           </div>
 
                           <div className="expanded-deps">

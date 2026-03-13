@@ -91,6 +91,8 @@ def _ensure_migration_units_table(cursor):
             source_path TEXT NOT NULL,
             actual_role TEXT NOT NULL,
             file_type TEXT NOT NULL,
+            target_path TEXT,
+            migration_action TEXT DEFAULT 'migrate',
             import_alias TEXT,
             iteration INTEGER,
             status TEXT DEFAULT 'pending',
@@ -101,7 +103,7 @@ def _ensure_migration_units_table(cursor):
 
     cursor.execute("PRAGMA table_info(migration_units)")
     columns = [row[1] for row in cursor.fetchall()]
-    desired_columns = ["id", "project_id", "source_path", "actual_role", "file_type", "import_alias", "iteration", "status"]
+    desired_columns = ["id", "project_id", "source_path", "actual_role", "file_type", "target_path", "migration_action", "import_alias", "iteration", "status"]
 
     if columns == desired_columns:
         return
@@ -114,6 +116,8 @@ def _ensure_migration_units_table(cursor):
         source_path TEXT NOT NULL,
         actual_role TEXT NOT NULL,
         file_type TEXT NOT NULL,
+        target_path TEXT,
+        migration_action TEXT DEFAULT 'migrate',
         import_alias TEXT,
         iteration INTEGER,
         status TEXT DEFAULT 'pending',
@@ -123,28 +127,34 @@ def _ensure_migration_units_table(cursor):
 
     old_columns = set(columns)
     if {"id", "project_id", "source_path", "iteration", "status"}.issubset(old_columns):
-        if {"actual_role", "file_type", "import_alias"}.issubset(old_columns):
+        if {"actual_role", "file_type", "import_alias", "target_path", "migration_action"}.issubset(old_columns):
             cursor.execute('''
-            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, import_alias, iteration, status)
-            SELECT id, project_id, source_path, actual_role, file_type, import_alias, iteration, status
+            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, target_path, migration_action, import_alias, iteration, status)
+            SELECT id, project_id, source_path, actual_role, file_type, target_path, migration_action, import_alias, iteration, status
+            FROM migration_units_old
+            ''')
+        elif {"actual_role", "file_type", "import_alias"}.issubset(old_columns):
+            cursor.execute('''
+            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, target_path, migration_action, import_alias, iteration, status)
+            SELECT id, project_id, source_path, actual_role, file_type, NULL AS target_path, 'migrate' AS migration_action, import_alias, iteration, status
             FROM migration_units_old
             ''')
         elif {"actual_role", "file_type"}.issubset(old_columns):
             cursor.execute('''
-            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, import_alias, iteration, status)
-            SELECT id, project_id, source_path, actual_role, file_type, '' AS import_alias, iteration, status
+            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, target_path, migration_action, import_alias, iteration, status)
+            SELECT id, project_id, source_path, actual_role, file_type, NULL AS target_path, 'migrate' AS migration_action, '' AS import_alias, iteration, status
             FROM migration_units_old
             ''')
         elif {"role", "import_alias"}.issubset(old_columns):
             cursor.execute('''
-            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, import_alias, iteration, status)
-            SELECT id, project_id, source_path, role, 'infra_file', import_alias, iteration, status
+            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, target_path, migration_action, import_alias, iteration, status)
+            SELECT id, project_id, source_path, role, 'infra_file', NULL AS target_path, 'migrate' AS migration_action, import_alias, iteration, status
             FROM migration_units_old
             ''')
         elif "role" in old_columns:
             cursor.execute('''
-            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, import_alias, iteration, status)
-            SELECT id, project_id, source_path, role, 'infra_file', '' AS import_alias, iteration, status
+            INSERT INTO migration_units (id, project_id, source_path, actual_role, file_type, target_path, migration_action, import_alias, iteration, status)
+            SELECT id, project_id, source_path, role, 'infra_file', NULL AS target_path, 'migrate' AS migration_action, '' AS import_alias, iteration, status
             FROM migration_units_old
             ''')
 

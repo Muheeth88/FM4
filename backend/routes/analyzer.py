@@ -97,7 +97,11 @@ async def get_migration_units(project_id: str):
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT id, source_path, actual_role, file_type, status, iteration FROM migration_units WHERE project_id = ? ORDER BY file_type ASC, iteration ASC", (project_id,))
+        cursor.execute(
+            "SELECT id, source_path, actual_role, file_type, target_path, migration_action, status, iteration "
+            "FROM migration_units WHERE project_id = ? ORDER BY file_type ASC, iteration ASC",
+            (project_id,)
+        )
         units = []
         for row in cursor.fetchall():
             units.append({
@@ -105,8 +109,9 @@ async def get_migration_units(project_id: str):
                 "source_path": row[1],
                 "actual_role": row[2],
                 "file_type": row[3],
-                "status": row[4],
-                "iteration": row[5]
+                "migration_action": row[5],
+                "status": row[6],
+                "iteration": row[7]
             })
         return units
     except Exception as e:
