@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { analyzerApi } from '../services/api';
 import { AlertCircle, FileText, Activity, Layers, Code, Share2 } from 'lucide-react';
 import './AnalysisReport.css';
@@ -56,6 +56,12 @@ function MigrationTable({
     return dependencies.filter(d => d.from === path);
   };
 
+  const [expandedIds, setExpandedIds] = useState<number[]>([]);
+
+  const toggleExpand = (id: number) => {
+    setExpandedIds((prev) => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
+
   return (
     <div className="units-section">
       <div className="section-header">
@@ -69,56 +75,64 @@ function MigrationTable({
             <tr>
               <th>Order</th>
               <th>Filename</th>
-              <th>Path</th>
-              <th>Actual Role</th>
+              <th>Role</th>
               <th>File Type</th>
-              <th>Dependencies</th>
             </tr>
           </thead>
           <tbody>
             {units.map((unit) => {
               const deps = getDependenciesFor(unit.source_path);
               const filename = unit.source_path.split(/[/\\]/).pop() || unit.source_path;
+              const isExpanded = expandedIds.includes(unit.id);
               return (
-                <tr key={unit.id}>
-                  <td><span className="iteration-badge">{unit.iteration}</span></td>
-                  <td>
-                    <div className="file-meta">
-                      <strong>{filename}</strong>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="path-container">
-                      <code className="path-code path-secondary">{unit.source_path}</code>
-                    </div>
-                  </td>
-                  <td><span className={`role-badge role-${unit.actual_role.replace('_', '-')}`}>{unit.actual_role}</span></td>
-                  <td><span className={`type-badge type-${unit.file_type.replace('_', '-')}`}>{unit.file_type}</span></td>
-                  <td>
-                    <div className="target-info">
-                      {deps.length > 0 ? (
-                        <div className="dependencies-list">
-                          <span className="label">Depends on:</span>
-                          {deps.map((d, i) => (
-                            <div key={i} className="dep-chip" title={d.to}>
-                              <code className="dep-tag">{d.to.split('/').pop()}</code>
-                              <span className={`dep-type ${d.to_file_type === 'test_file' ? 'test' : 'infra'}`}>
-                                {d.to_file_type || 'unknown'}
-                              </span>
-                            </div>
-                          ))}
+                <React.Fragment key={unit.id}>
+                  <tr key={unit.id} className="row-clickable" onClick={() => toggleExpand(unit.id)}>
+                    <td><span className="iteration-badge">{unit.iteration}</span></td>
+                    <td>
+                      <div className="file-meta">
+                        <strong>{filename}</strong>
+                      </div>
+                    </td>
+                    <td><span className={`role-badge role-${unit.actual_role.replace('_', '-')}`}>{unit.actual_role}</span></td>
+                    <td><span className={`type-badge type-${unit.file_type.replace('_', '-')}`}>{unit.file_type}</span></td>
+                  </tr>
+
+                  {isExpanded && (
+                    <tr className="expanded-row" key={unit.id + '-expanded'}>
+                      <td colSpan={4}>
+                        <div className="expanded-content">
+                          <div className="expanded-path">
+                            <strong>Path:</strong>
+                            <code className="path-code" style={{marginLeft: '10px'}}>{unit.source_path}</code>
+                          </div>
+
+                          <div className="expanded-deps">
+                            <strong>Dependencies:</strong>
+                            {deps.length > 0 ? (
+                              <div className="dependencies-list" style={{marginTop: '8px'}}>
+                                {deps.map((d, i) => (
+                                  <div key={i} className="dep-chip" title={d.to}>
+                                    <code className="dep-tag">{d.to.split('/').pop()}</code>
+                                    <span className={`dep-type ${d.to_file_type === 'test_file' ? 'test' : 'infra'}`}>
+                                      {d.to_file_type || 'unknown'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="no-deps">No dependencies</span>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <span className="no-deps">-</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
             {units.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center empty-row">
+                <td colSpan={4} className="text-center empty-row">
                   No files found in this category.
                 </td>
               </tr>
@@ -135,6 +149,7 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
   const [units, setUnits] = useState<MigrationUnit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -156,14 +171,19 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
     fetchData();
   }, [projectId]);
 
+  const filteredUnits = useMemo(() => {
+    if (!selectedRoleFilter) return units;
+    return units.filter(u => u.actual_role === selectedRoleFilter);
+  }, [units, selectedRoleFilter]);
+
   const testUnits = useMemo(
-    () => units.filter(u => u.file_type === 'test_file'),
-    [units]
+    () => filteredUnits.filter(u => u.file_type === 'test_file'),
+    [filteredUnits]
   );
 
   const infraUnits = useMemo(
-    () => units.filter(u => u.file_type === 'infra_file'),
-    [units]
+    () => filteredUnits.filter(u => u.file_type === 'infra_file'),
+    [filteredUnits]
   );
 
   const dependencyView = useMemo(() => {
@@ -235,7 +255,13 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
         <h3>Actual Role Breakdown</h3>
         <div className="role-summary-grid">
           {Object.entries(summary.file_counts).map(([role, count]) => (
-            <div key={role} className="role-summary-card">
+            <div
+              key={role}
+              className={`role-summary-card ${selectedRoleFilter === role ? 'active' : ''}`}
+              onClick={() => setSelectedRoleFilter(prev => prev === role ? null : role)}
+              style={{cursor: 'pointer'}}
+              role="button"
+            >
               <span className={`role-badge role-${role.replace('_', '-')}`}>{role}</span>
               <strong>{count}</strong>
             </div>

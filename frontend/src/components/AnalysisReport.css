@@ -149,6 +149,12 @@
   border-radius: 14px;
 }
 
+.role-summary-card.active {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 30px rgba(15,23,42,0.08);
+  border-color: rgba(14,165,233,0.18);
+}
+
 .table-responsive {
   overflow-x: auto;
 }
@@ -259,6 +265,36 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.2px;
+}
+
+.row-clickable {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.row-clickable:hover {
+  background: rgba(15, 23, 42, 0.02);
+}
+
+.expanded-row td {
+  background: rgba(248, 250, 252, 0.6);
+}
+
+.expanded-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 6px;
+}
+
+.expanded-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expanded-deps {
+  display: flex;
+  flex-direction: column;
 }
 
 .type-badge,
