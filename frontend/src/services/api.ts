@@ -35,4 +35,7 @@ export const analyzerApi = {
     
   getMigrationUnits: (projectId: string) =>
     axios.get(`${API_BASE_URL}/analyzer/${projectId}/migration-units`),
+
+  migrateInfra: (projectId: string) =>
+    axios.post(`${API_BASE_URL}/analyzer/${projectId}/migrate-infra`),
 };

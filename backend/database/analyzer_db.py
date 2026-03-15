@@ -72,15 +72,15 @@ class AnalyzerDBWrapper:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-            INSERT INTO migration_units (project_id, source_path, actual_role, file_type, target_path, migration_action, import_alias, iteration, status)
+            INSERT INTO migration_units (project_id, source_path, actual_role, file_type, suggested_target_path, suggested_action, import_alias, iteration, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 unit["project_id"],
                 unit["source_path"],
                 unit["actual_role"],
                 unit["file_type"],
-                unit["target_path"],
-                unit["migration_action"],
+                unit["suggested_target_path"],
+                unit["suggested_action"],
                 unit["import_alias"],
                 unit["iteration"],
                 unit["status"]
@@ -146,3 +146,62 @@ class AnalyzerDBWrapper:
         finally:
             conn.close()
         return deps
+
+    @staticmethod
+    def get_repository_summary(project_id: str) -> Dict[str, Any] | None:
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT summary_json FROM repository_summary WHERE project_id = ?",
+                (project_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return json.loads(row[0])
+        except Exception as e:
+            logger.error(f"Error getting repository summary: {e}")
+            return None
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_migration_units(project_id: str, file_type: str | None = None) -> List[Dict[str, Any]]:
+        conn = get_db()
+        cursor = conn.cursor()
+        units = []
+        try:
+            query = (
+                "SELECT id, source_path, actual_role, file_type, suggested_target_path, suggested_action, "
+                "import_alias, iteration, status "
+                "FROM migration_units WHERE project_id = ?"
+            )
+            params: list[Any] = [project_id]
+
+            if file_type:
+                query += " AND file_type = ?"
+                params.append(file_type)
+
+            query += " ORDER BY iteration ASC, id ASC"
+            cursor.execute(query, params)
+
+            for row in cursor.fetchall():
+                units.append(
+                    {
+                        "id": row[0],
+                        "source_path": row[1],
+                        "actual_role": row[2],
+                        "file_type": row[3],
+                        "suggested_target_path": row[4],
+                        "suggested_action": row[5],
+                        "import_alias": row[6],
+                        "iteration": row[7],
+                        "status": row[8],
+                    }
+                )
+        except Exception as e:
+            logger.error(f"Error getting migration units: {e}")
+        finally:
+            conn.close()
+        return units

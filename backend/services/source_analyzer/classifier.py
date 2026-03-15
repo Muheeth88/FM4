@@ -18,6 +18,9 @@ class FileClassifier:
         if filename == ".gitignore":
             return "repo_config"
 
+        if filename in {"readme.md", "readme.txt"} or normalized_path.endswith("/docs"):
+            return "repo_config"
+
         if "/infra/" in normalized_path or normalized_path.endswith("/infra"):
             return "infra_resources"
 

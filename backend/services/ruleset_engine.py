@@ -35,6 +35,9 @@ class RulesetEngine:
         if filename == ".gitignore":
             return ".gitignore"
 
+        if filename.lower() in {"readme.md", "readme.txt"}:
+            return f"docs/{filename}"
+
         if "/infra/" in lowercase_source:
             return f"infra/{normalized_source.split('/infra/', 1)[1]}"
 
@@ -57,7 +60,7 @@ class RulesetEngine:
         if filename == "pom.xml":
             return "analyze_only"
 
-        if filename == ".gitignore" or "/infra/" in normalized_source or "/resources/" in normalized_source:
+        if filename in {".gitignore", "readme.md", "readme.txt"} or "/infra/" in normalized_source or "/resources/" in normalized_source:
             return "copy"
 
         return "migrate"
@@ -88,16 +91,14 @@ class RulesetEngine:
         clean_name = re.sub(r'(Page|Test|Spec)$', '', basename)
         
         # Convert to kebab case
-        kebab_name = re.sub(r'(?<!^)(?=[A-Z])', '-', clean_name).lower()
+        kebab_name = self._to_kebab_case(clean_name)
+        normalized_suffix = self._normalize_suffix(suffix)
         
         # Apply suffix
-        if suffix.startswith("."):
-            target_filename = f"{kebab_name}{suffix}"
+        if normalized_suffix.startswith("."):
+            target_filename = f"{kebab_name}{normalized_suffix}"
         else:
-            # Handle cases like "Page.ts" -> "loginPage.ts" (though kebab is usually better)
-            # If suffix is "Page.ts", maybe it wants "loginPage.ts" or "login-page.ts"
-            # The YAML says "Page.ts" for pages.
-            target_filename = f"{kebab_name}{suffix}"
+            target_filename = f"{kebab_name}{normalized_suffix}"
         
         # Compose path (following the YAML target_structure convention where 'src' is the root for code)
         target_path = os.path.join("src", folder, target_filename).replace('\\', '/')
@@ -117,4 +118,22 @@ class RulesetEngine:
         
         # Fallback to just the path
         return f"./{path_without_ext}"
+
+    @staticmethod
+    def _to_kebab_case(value: str) -> str:
+        normalized = value.replace("_", "-")
+        normalized = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1-\2", normalized)
+        normalized = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", normalized)
+        normalized = re.sub(r"-{2,}", "-", normalized)
+        return normalized.strip("-").lower()
+
+    def _normalize_suffix(self, suffix: str) -> str:
+        if suffix.startswith("."):
+            return suffix
+
+        match = re.fullmatch(r"([A-Za-z0-9]+)\.ts", suffix)
+        if not match:
+            return suffix
+
+        return f".{self._to_kebab_case(match.group(1))}.ts"
 

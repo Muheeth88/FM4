@@ -1,4 +1,6 @@
 import logging
+from pathlib import Path
+
 from .repository_scanner import RepositoryScanner
 from .ast_parser import ASTParser
 from .classifier import FileClassifier
@@ -94,6 +96,12 @@ class AnalyzerService:
             if file.get("actual_role") == "unknown":
                 file["actual_role"] = "utilities"
                 file["actual_role_source"] = "fallback"
+
+            refined_role = self._refine_role(file)
+            if refined_role != file.get("actual_role"):
+                file["actual_role"] = refined_role
+                file["actual_role_source"] = "analyzer_refinement"
+
             file["file_type"] = self.classifier.classify_file_type(file, file["actual_role"])
 
         self.db.clear_project_analysis(project_id)
@@ -133,3 +141,76 @@ class AnalyzerService:
         logger.info("Repository analysis completed")
         await emit_progress("Complete", "completed", "Repository analysis finished!")
         return True
+
+    def _refine_role(self, file):
+        current_role = file.get("actual_role")
+        path = (file.get("path") or "").replace("\\", "/").lower()
+        filename = Path(path).name.lower()
+        basename = Path(filename).stem.lower()
+        source_blob = self._build_source_blob(file)
+
+        if self._looks_like_utility(path, basename, source_blob):
+            return "utilities"
+
+        return current_role
+
+    @staticmethod
+    def _build_source_blob(file):
+        return " ".join(
+            str(part).lower()
+            for part in (
+                file.get("source", ""),
+                file.get("content_preview", ""),
+                file.get("imports", []),
+                file.get("classes", []),
+            )
+            if part
+        )
+
+    @staticmethod
+    def _looks_like_utility(path, basename, source_blob):
+        utility_suffixes = (
+            "util",
+            "utils",
+            "helper",
+            "helpers",
+            "constants",
+            "constant",
+            "validator",
+            "validators",
+            "listener",
+            "listeners",
+            "factory",
+            "formatter",
+        )
+        utility_path_tokens = (
+            "/utils/",
+            "/utility/",
+            "/utilities/",
+            "/constants/",
+            "/common/",
+            "/support/",
+            "/helpers/",
+        )
+        utility_source_tokens = (
+            "loggerfactory",
+            "slf4j",
+            "randomstringutils",
+            "randomutil",
+            "webdriverwait",
+            "expectedconditions",
+            "java.util.random",
+        )
+
+        if any(path_token in path for path_token in utility_path_tokens):
+            return True
+
+        if any(basename.endswith(token) for token in utility_suffixes):
+            return True
+
+        if any(token in source_blob for token in utility_source_tokens) and any(
+            token in basename for token in ("util", "helper", "constant")
+        ):
+            return True
+
+        return False

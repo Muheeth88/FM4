@@ -6,6 +6,7 @@ from database.db import get_db
 from database.analyzer_db import AnalyzerDBWrapper
 from services.ruleset_engine import RulesetEngine
 from services.project_service import ProjectService
+from services.migration_workflow_service import MigrationWorkflowService
 import os
 import json
 
@@ -98,7 +99,7 @@ async def get_migration_units(project_id: str):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "SELECT id, source_path, actual_role, file_type, target_path, migration_action, status, iteration "
+            "SELECT id, source_path, actual_role, file_type, suggested_target_path, suggested_action, status, iteration "
             "FROM migration_units WHERE project_id = ? ORDER BY file_type ASC, iteration ASC",
             (project_id,)
         )
@@ -109,7 +110,8 @@ async def get_migration_units(project_id: str):
                 "source_path": row[1],
                 "actual_role": row[2],
                 "file_type": row[3],
-                "migration_action": row[5],
+                "suggested_target_path": row[4],
+                "suggested_action": row[5],
                 "status": row[6],
                 "iteration": row[7]
             })
@@ -119,3 +121,24 @@ async def get_migration_units(project_id: str):
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         conn.close()
+
+
+@router.post("/{project_id}/migrate-infra")
+async def migrate_infra(project_id: str):
+    """Run the current migrate-infra workflow, which currently prepares planner context."""
+    project = ProjectService.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    try:
+        workflow_service = MigrationWorkflowService()
+        return workflow_service.run_migrate_infra(project_id)
+    except FileNotFoundError as e:
+        logger.error(f"Context preparation failed for {project_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
+        logger.error(f"Context preparation failed for {project_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected context preparation error for {project_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to prepare planner context")

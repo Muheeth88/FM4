@@ -17,12 +17,12 @@ class MigrationUnitBuilder:
                     "source_path": path,
                     "actual_role": file["actual_role"],
                     "file_type": file["file_type"],
-                    "target_path": self.ruleset.resolve_target_path_for_file(path, file["actual_role"]),
-                    "migration_action": self.ruleset.determine_migration_action(path, file["actual_role"]),
+                    "suggested_target_path": self.ruleset.resolve_target_path_for_file(path, file["actual_role"]),
+                    "suggested_action": self.ruleset.determine_migration_action(path, file["actual_role"]),
                     "import_alias": "",
                     "iteration": iteration,
                     "status": "pending"
                 }
-                if unit["migration_action"] == "migrate":
-                    unit["import_alias"] = self.ruleset.get_import_alias(unit["target_path"])
+                if unit["suggested_action"] == "migrate":
+                    unit["import_alias"] = self.ruleset.get_import_alias(unit["suggested_target_path"])
                 self.db.insert_migration_unit(unit)

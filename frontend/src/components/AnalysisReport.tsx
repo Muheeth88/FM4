@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { analyzerApi } from '../services/api';
-import { AlertCircle, FileText, Activity, Layers, Code, Share2 } from 'lucide-react';
+import { AlertCircle, FileText, Activity, Layers, Code, Share2, WandSparkles } from 'lucide-react';
 import './AnalysisReport.css';
 
 interface FileCounts {
@@ -37,8 +37,8 @@ interface MigrationUnit {
   source_path: string;
   actual_role: string;
   file_type: string;
-  target_path: string;
-  migration_action: string;
+  suggested_target_path: string;
+  suggested_action: string;
   status: string;
   iteration: number;
 }
@@ -110,12 +110,12 @@ function MigrationTable({
 
                           <div className="expanded-path">
                             <strong>Target:</strong>
-                            <code className="path-code" style={{marginLeft: '10px'}}>{unit.target_path || 'Not resolved'}</code>
+                            <code className="path-code" style={{marginLeft: '10px'}}>{unit.suggested_target_path || 'Not resolved'}</code>
                           </div>
 
                           <div className="expanded-path">
                             <strong>Action:</strong>
-                            <code className="path-code" style={{marginLeft: '10px'}}>{unit.migration_action}</code>
+                            <code className="path-code" style={{marginLeft: '10px'}}>{unit.suggested_action}</code>
                           </div>
 
                           <div className="expanded-deps">
@@ -162,6 +162,8 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string | null>(null);
+  const [isPreparingContext, setIsPreparingContext] = useState(false);
+  const [contextMessage, setContextMessage] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -219,6 +221,21 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
     );
   }
 
+  const handleMigrateInfra = async () => {
+    try {
+      setIsPreparingContext(true);
+      setContextMessage('');
+      const response = await analyzerApi.migrateInfra(projectId);
+      console.log('FM4 Context Builder Prompt:', response.data.prompt);
+      console.log('FM4 Context Builder Payload:', response.data.context);
+      setContextMessage('Context preparation completed. The final planner prompt has been logged to the browser console.');
+    } catch (err: any) {
+      setContextMessage(err.response?.data?.detail || 'Failed to prepare migration context.');
+    } finally {
+      setIsPreparingContext(false);
+    }
+  };
+
   return (
     <div className="analysis-dashboard">
       <div className="dashboard-header">
@@ -226,8 +243,24 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
           <p className="eyebrow">Repository Intelligence</p>
           <h2><Activity size={24} /> Repository Analysis Report</h2>
         </div>
-        <span className="project-id-badge">Project: {projectId}</span>
+        <div className="header-actions">
+          <button
+            className="context-action-btn"
+            onClick={handleMigrateInfra}
+            disabled={isPreparingContext}
+          >
+            <WandSparkles size={16} />
+            {isPreparingContext ? 'Preparing Context...' : 'Migrate Infra'}
+          </button>
+          <span className="project-id-badge">Project: {projectId}</span>
+        </div>
       </div>
+
+      {contextMessage && (
+        <div className={`context-message ${contextMessage.startsWith('Failed') ? 'error' : 'success'}`}>
+          {contextMessage}
+        </div>
+      )}
 
       <div className="dashboard-grid">
         <div className="stat-card total">
