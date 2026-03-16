@@ -126,7 +126,9 @@ class PlannerAgentService:
         prompt_input = json.dumps(context, indent=2)
 
         logger.info(f"Invoking Planner Agent with Context Builder payload for project {project_id}")
-        raw_output = agent.invoke_json(prompt_input)
+        response = agent.invoke_json_with_metadata(prompt_input)
+        raw_output = response["output"]
+        telemetry = response["metadata"]
 
         if isinstance(raw_output, dict):
             raw_output["planner_version"] = "1.0.0"
@@ -153,7 +155,7 @@ class PlannerAgentService:
             validated_plan = PlannerOutputSchema(**raw_output)
             plan_dict = validated_plan.model_dump()
             logger.info("Planner plan validated successfully.")
-            return plan_dict
+            return {"plan": plan_dict, "telemetry": telemetry}
         except ValidationError as e:
             logger.error("Planner output failed to validate against output schema.")
             raise ValueError(f"Planner plan validation failed: {str(e)}")

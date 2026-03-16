@@ -52,9 +52,16 @@ class BaseLLMAgentService:
             ]
         })
         duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        metadata = self._extract_metadata(response, user_input, duration_ms)
+        
+        logger.info(
+            "--- LLM Agent Call Telemetry ---\n%s\n--------------------------------",
+            json.dumps(metadata, indent=2)
+        )
+
         return {
             "output": self._extract_output(response),
-            "metadata": self._extract_metadata(response, user_input, duration_ms),
+            "metadata": metadata,
             "raw_response": response,
         }
 

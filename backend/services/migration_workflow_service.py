@@ -25,11 +25,12 @@ class MigrationWorkflowService:
         context_payload = self.context_builder.build_planner_context(project_id, workflow_scope="infra")
         
         logger.info("Executing Planner Agent for project %s. This might take a bit.", project_id)
-        plan = self.planner_agent.generate_plan(project_id, context_payload)
+        result = self.planner_agent.generate_plan(project_id, context_payload)
         
         logger.info("Planner Agent plan generated successfully for project %s", project_id)
         return {
             "project_id": project_id,
             "status": "completed",
-            "migration_plan": plan
+            "migration_plan": result["plan"],
+            "telemetry": result["telemetry"]
         }

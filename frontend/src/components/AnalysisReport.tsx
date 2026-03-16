@@ -242,8 +242,9 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
       setIsInvokingPlanner(true);
       setContextMessage('');
       const response = await analyzerApi.invokePlanner(projectId);
-      console.log('Planner Agent Response:', response.data);
-      setContextMessage('Planner Agent execution completed. Plan logged to console.');
+      console.log('Planner Agent Response:', response.data.migration_plan);
+      console.log('Planner Agent Telemetry:', response.data.telemetry);
+      setContextMessage('Planner Agent execution completed. Plan and Telemetry logged to console.');
     } catch (err: any) {
       setContextMessage(err.response?.data?.detail || 'Failed to execute planner agent.');
     } finally {
