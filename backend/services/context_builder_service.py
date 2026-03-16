@@ -234,11 +234,14 @@ class ContextBuilderService:
             "which means everything except actual test files. Use only the provided repository metadata, repository summary, "
             "target framework characteristics, ruleset, target naming conventions, migration graph, suggested actions, "
             "and suggested target paths. The migration graph already contains the analyzer-computed topological order, so do not "
-            "recompute ordering from scratch. suggestedAction and suggestedTargetPath are preliminary analyzer suggestions. "
-            "You may override them if dependency structure or target framework architecture requires it. Each file starts as a "
-            "migration unit, but you may split or merge units when the plan benefits from it. Do not split files unless they contain "
-            "multiple logical classes or clearly separable domains. Produce only a migration plan that "
-            "matches the planner_output_schema, not code. Preserve intent, avoid inventing repository facts, and optimize for safe incremental delivery."
+            "recompute ordering from scratch.\n\n"
+            "CRITICAL ARCHITECTURAL RULES:\n"
+            "1. You MUST actively group logically similar files into MERGED plan units. Examples: Do NOT create 20 separate API service files if they belong to one 'crm.service.ts'. Do NOT create 10 separate util files if they can be 'string-util.ts' and 'date-util.ts'.\n"
+            "2. plan_unit_ids MUST be semantic, e.g., 'plan_unit_utils_api' or 'plan_unit_services_core'. NEVER use numeric IDs like '3570'.\n"
+            "3. The execution_order MUST not just replay unit IDs. Group execution order into logical architectural layers (e.g. Config Layer -> Utilities Layer -> Services Layer -> Pages Layer).\n"
+            "4. EVERY target_path in target_paths_final MUST BE UNIQUE. **Never output the exact same target path in two different plan units.** Furthermore, if multiple source files merge into a single target file, output the target file path EXACTLY ONCE in the target_paths_final array. Do NOT include duplicates inside a single target_paths_final list.\n"
+            "5. suggestedAction and suggestedTargetPath are preliminary hints. You MUST override them if dependency structure or the target paths collide.\n\n"
+            "Produce only a migration plan that matches the planner_output_schema, not code. Preserve intent, avoid inventing repository facts, and optimize for safe incremental delivery."
         )
 
     @staticmethod
@@ -282,12 +285,21 @@ class ContextBuilderService:
             "consume_precomputed_topological_order",
             "avoid_creating_duplicate_utilities",
             "do_not_split_files_without_multiple_logical_classes_or_domains",
-            "suggested_action_and_target_path_are_hints_not_final",
+            "target_paths_final_must_be_strictly_unique_across_all_plan_units",
+            "target_paths_final_must_contain_no_duplicate_strings_within_a_single_unit",
+            "plan_unit_ids_must_be_semantic_and_descriptive",
+            "execution_order_must_represent_logical_architectural_layers",
+            "actively_group_similar_files_into_merged_plan_units",
         ]
 
     @staticmethod
     def _build_planner_output_schema(workflow_scope: str) -> Dict[str, Any]:
         return {
+            "planner_version": "string",
+            "planner_model": "string",
+            "planning_timestamp": "string",
+            "source_language": "string",
+            "target_language": "string",
             "migration_phase": workflow_scope,
             "planning_mode": "one_shot",
             "plan_summary": {
@@ -297,15 +309,18 @@ class ContextBuilderService:
                 "direct_migrations": 0,
             },
             "execution_order": [
-                "migration_unit_id or planner_group_id"
+                "semantic_plan_unit_id_or_logical_layer"
             ],
             "plan_units": [
                 {
-                    "plan_unit_id": "string",
+                    "plan_unit_id": "semantic_string (e.g. plan_unit_utils_api)",
                     "source_migration_unit_ids": [123],
+                    "source_paths": ["string"],
+                    "role": "string",
+                    "target_role": "string",
                     "decision": "migrate|copy|analyze_only|split|merge|skip",
                     "target_paths_final": ["string"],
-                    "depends_on": ["plan_unit_id or migration_unit_id"],
+                    "depends_on": ["semantic_plan_unit_id"],
                     "reason": "string",
                     "notes": ["string"],
                 }

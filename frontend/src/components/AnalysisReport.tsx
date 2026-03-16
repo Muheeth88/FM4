@@ -163,6 +163,7 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
   const [error, setError] = useState('');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string | null>(null);
   const [isPreparingContext, setIsPreparingContext] = useState(false);
+  const [isInvokingPlanner, setIsInvokingPlanner] = useState(false);
   const [contextMessage, setContextMessage] = useState('');
 
   useEffect(() => {
@@ -236,6 +237,20 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
     }
   };
 
+  const handleInvokePlanner = async () => {
+    try {
+      setIsInvokingPlanner(true);
+      setContextMessage('');
+      const response = await analyzerApi.invokePlanner(projectId);
+      console.log('Planner Agent Response:', response.data);
+      setContextMessage('Planner Agent execution completed. Plan logged to console.');
+    } catch (err: any) {
+      setContextMessage(err.response?.data?.detail || 'Failed to execute planner agent.');
+    } finally {
+      setIsInvokingPlanner(false);
+    }
+  };
+
   return (
     <div className="analysis-dashboard">
       <div className="dashboard-header">
@@ -247,10 +262,19 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
           <button
             className="context-action-btn"
             onClick={handleMigrateInfra}
-            disabled={isPreparingContext}
+            disabled={isPreparingContext || isInvokingPlanner}
           >
             <WandSparkles size={16} />
             {isPreparingContext ? 'Preparing Context...' : 'Migrate Infra'}
+          </button>
+          <button
+            className="context-action-btn"
+            onClick={handleInvokePlanner}
+            disabled={isPreparingContext || isInvokingPlanner}
+            style={{ marginLeft: '10px' }}
+          >
+            <WandSparkles size={16} />
+            {isInvokingPlanner ? 'Invoking Planner...' : 'Invoke Planner Agent'}
           </button>
           <span className="project-id-badge">Project: {projectId}</span>
         </div>

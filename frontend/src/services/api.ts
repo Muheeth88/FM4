@@ -38,4 +38,7 @@ export const analyzerApi = {
 
   migrateInfra: (projectId: string) =>
     axios.post(`${API_BASE_URL}/analyzer/${projectId}/migrate-infra`),
+
+  invokePlanner: (projectId: string) =>
+    axios.post(`${API_BASE_URL}/analyzer/${projectId}/invoke-planner`),
 };
