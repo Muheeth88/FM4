@@ -121,9 +121,17 @@ class ContextBuilderService:
                 "source_branch": project["source"]["branch"],
                 "repository_url": project["repo_url"],
             },
+            "target_framework_characteristics": {
+                "fixture_based": True,
+                "async_required": True,
+            },
             "repository_summary": repository_summary,
-            "repository_structure": repository_structure,
-            "ruleset": self.ruleset_engine.ruleset,
+            # "repository_structure": repository_structure,
+            "ruleset": {
+                "classification": self.ruleset_engine.ruleset.get("classification", {}),
+                "target_structure": self.ruleset_engine.ruleset.get("target_structure", {}),
+                "naming": self.ruleset_engine.ruleset.get("naming", {})
+            },
             "target_naming_conventions": normalized_target_naming_conventions,
             "migration_graph": migration_graph["graph"],
             "migration_units": migration_units_payload,
@@ -174,11 +182,11 @@ class ContextBuilderService:
                     "file_type": unit["file_type"],
                     "target_role": target_metadata["target_role"],
                     "target_folder": target_metadata["target_folder"],
-                    "target_file_template": target_metadata["target_file_template"],
+                    # "target_file_template": target_metadata["target_file_template"],
                     "suggested_action": normalized_suggestion["suggested_action"],
                     "suggested_target_path": normalized_suggestion["suggested_target_path"],
                     "depends_on": depends_on_map.get(unit["id"], []),
-                    "ast_signature": signatures.get(unit["source_path"], {}),
+                    # "ast_signature": signatures.get(unit["source_path"], {}),
                 }
             )
 
@@ -206,8 +214,8 @@ class ContextBuilderService:
             f"{json.dumps(context['repository_metadata'], indent=2)}\n\n"
             "Repository Summary:\n"
             f"{json.dumps(context['repository_summary'], indent=2)}\n\n"
-            "Repository Structure:\n"
-            f"{json.dumps(context['repository_structure'], indent=2)}\n\n"
+            "Target Framework Characteristics:\n"
+            f"{json.dumps(context.get('target_framework_characteristics', {}), indent=2)}\n\n"
             "Ruleset:\n"
             f"{json.dumps(context['ruleset'], indent=2)}\n\n"
             "Target Naming Conventions:\n"
@@ -224,7 +232,7 @@ class ContextBuilderService:
             "You are the planner agent for the Quality Engineering Framework migration workflow. "
             f"This is a one-shot {workflow_scope} migration planning step. Plan the migration of the whole infra surface, "
             "which means everything except actual test files. Use only the provided repository metadata, repository summary, "
-            "repository structure, ruleset, target naming conventions, structured ast signatures, migration graph, suggested actions, "
+            "target framework characteristics, ruleset, target naming conventions, migration graph, suggested actions, "
             "and suggested target paths. The migration graph already contains the analyzer-computed topological order, so do not "
             "recompute ordering from scratch. suggestedAction and suggestedTargetPath are preliminary analyzer suggestions. "
             "You may override them if dependency structure or target framework architecture requires it. Each file starts as a "
