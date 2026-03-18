@@ -41,4 +41,7 @@ export const analyzerApi = {
 
   invokePlanner: (projectId: string) =>
     axios.post(`${API_BASE_URL}/analyzer/${projectId}/invoke-planner`),
+
+  generateCode: (projectId: string, planPayload: any) =>
+    axios.post(`${API_BASE_URL}/analyzer/${projectId}/generate-code`, planPayload),
 };

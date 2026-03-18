@@ -163,3 +163,25 @@ async def invoke_planner(project_id: str):
     except Exception as e:
         logger.error(f"Unexpected planner execution error for {project_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to execute planner agent")
+
+
+@router.post("/{project_id}/generate-code")
+async def generate_code(project_id: str, plan_payload: Dict[str, Any]):
+    """Execute the migration plan to generate code on disk."""
+    project = ProjectService.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    try:
+        workflow_service = MigrationWorkflowService()
+        # plan_payload is expected to be the contents of result["plan"] 
+        return workflow_service.invoke_generator(project_id, plan_payload)
+    except FileNotFoundError as e:
+        logger.error(f"Generator failed for {project_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
+        logger.error(f"Generator execution failed for {project_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected generator error for {project_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate code from plan")

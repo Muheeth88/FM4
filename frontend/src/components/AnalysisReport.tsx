@@ -164,7 +164,9 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string | null>(null);
   const [isPreparingContext, setIsPreparingContext] = useState(false);
   const [isInvokingPlanner, setIsInvokingPlanner] = useState(false);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [contextMessage, setContextMessage] = useState('');
+  const [currentPlan, setCurrentPlan] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -244,11 +246,31 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
       const response = await analyzerApi.invokePlanner(projectId);
       console.log('Planner Agent Response:', response.data.migration_plan);
       console.log('Planner Agent Telemetry:', response.data.telemetry);
+      setCurrentPlan(response.data.migration_plan);
       setContextMessage('Planner Agent execution completed. Plan and Telemetry logged to console.');
     } catch (err: any) {
       setContextMessage(err.response?.data?.detail || 'Failed to execute planner agent.');
     } finally {
       setIsInvokingPlanner(false);
+    }
+  };
+
+  const handleGenerateCode = async () => {
+    if (!currentPlan) {
+      setContextMessage('No plan available. Please run "Invoke Planner Agent" first.');
+      return;
+    }
+
+    try {
+      setIsGeneratingCode(true);
+      setContextMessage('');
+      const response = await analyzerApi.generateCode(projectId, currentPlan);
+      console.log('Generate Code Response:', response.data.generation_results);
+      setContextMessage('Code Generation completed. Check the target repository.');
+    } catch (err: any) {
+      setContextMessage(err.response?.data?.detail || 'Failed to generate code.');
+    } finally {
+      setIsGeneratingCode(false);
     }
   };
 
@@ -263,7 +285,7 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
           <button
             className="context-action-btn"
             onClick={handleMigrateInfra}
-            disabled={isPreparingContext || isInvokingPlanner}
+            disabled={isPreparingContext || isInvokingPlanner || isGeneratingCode}
           >
             <WandSparkles size={16} />
             {isPreparingContext ? 'Preparing Context...' : 'Migrate Infra'}
@@ -271,11 +293,20 @@ export default function AnalysisReport({ projectId }: { projectId: string }) {
           <button
             className="context-action-btn"
             onClick={handleInvokePlanner}
-            disabled={isPreparingContext || isInvokingPlanner}
+            disabled={isPreparingContext || isInvokingPlanner || isGeneratingCode}
             style={{ marginLeft: '10px' }}
           >
             <WandSparkles size={16} />
             {isInvokingPlanner ? 'Invoking Planner...' : 'Invoke Planner Agent'}
+          </button>
+          <button
+            className="context-action-btn"
+            onClick={handleGenerateCode}
+            disabled={isPreparingContext || isInvokingPlanner || isGeneratingCode || !currentPlan}
+            style={{ marginLeft: '10px', backgroundColor: currentPlan ? '#10B981' : '#6B7280' }}
+          >
+            <Code size={16} />
+            {isGeneratingCode ? 'Generating Code...' : 'Generate Code'}
           </button>
           <span className="project-id-badge">Project: {projectId}</span>
         </div>
